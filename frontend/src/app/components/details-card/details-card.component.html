@@ -8,7 +8,7 @@
 
 
 
-  <div class="card" *ngIf="showdetails">
+  <div class="card" *ngIf="event_details">
     <div class = "row">
       <div class="back_button">
       <button class="btn btn-secondary back-button" (click)="goBack()">
@@ -17,12 +17,13 @@
     </div>
 
     <div class="row">
+      <p *ngIf="favoriteError" role="alert">{{ favoriteError }}</p>
       <div class="heading">{{ event_details.name1 }}
-        <span class="fa-stack" (click)="toggleFavorite()">
+        <button type="button" class="fa-stack btn p-0 border-0" aria-label="Favorite event" [attr.aria-pressed]="event_details.isFav" (click)="toggleFavorite()">
           <i class="fas fa-circle fa-stack-2x" style="color: white;"></i>
           <i class="far fa-heart fa-stack-1x" [ngClass]="{'text-black': !event_details.isFav}" *ngIf="!event_details.isFav"></i>
           <i class="fas fa-heart fa-stack-1x" [ngClass]="{'text-danger': event_details.isFav}" *ngIf="event_details.isFav"></i>
-        </span>
+        </button>
       </div>
       
     </div>
@@ -288,7 +289,8 @@
           </div>
 
           <div class="row" style="margin-top: 10px;">
-            <button type="button" class="btn btn-danger" style="width: auto; margin-left: auto; margin-right: auto;" (click)="openGoogleMapsModal()">Show venue on Google Maps</button>
+            <button type="button" class="btn btn-danger" style="width: auto; margin-left: auto; margin-right: auto;" *ngIf="venue_info?.latitude != null && venue_info?.longitude != null" [disabled]="mapLoading" (click)="openGoogleMapsModal()">Show venue on Google Maps</button>
+            <p *ngIf="mapError" role="alert">{{ mapError }}</p>
           </div>
 
 

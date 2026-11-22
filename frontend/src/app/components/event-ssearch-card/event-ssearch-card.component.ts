@@ -1,103 +1,109 @@
-import { Component, Output, EventEmitter } from '@angular/core';
-import axios from 'axios';
-import { HttpClient } from '@angular/common/http';
-import { SharedShowdetailsService } from '../../service/shared-showdetails.service';
-
+import { Component, OnDestroy } from '@angular/core';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, Subscription, switchMap, timer } from 'rxjs';
 
 @Component({
   selector: 'app-event-ssearch-card',
   templateUrl: './event-ssearch-card.component.html',
   styleUrls: ['./event-ssearch-card.component.css']
 })
-export class EventSsearchCardComponent {
+export class EventSsearchCardComponent implements OnDestroy {
   auto_detect = false;
   events: any[] = [];
-  showtable = false;
-  showdetails = false;
   suggestions: string[] = [];
   keyword = '';
-  isSubmit = false;
-  True: any;
-  constructor(private http: HttpClient,private share_details:SharedShowdetailsService) {}
+  distance: number | null = null;
+  category = 'default';
+  location = '';
+  status: 'idle' | 'loading' | 'success' | 'error' = 'idle';
+  error = '';
 
-  @Output() showtableChange = new EventEmitter<boolean>();
-  @Output() showdetailsChange = new EventEmitter<boolean>();
+  private search?: Subscription;
+  private autocomplete?: Subscription;
 
-  auto_complete(keyword: string) {
-    if(keyword == '' || keyword == null) {
-      this.suggestions = [];
-      return;
-    }
-    const url = `https://advait-12334123.uw.r.appspot.com/autocomplete?keyword=${keyword}`;
-    this.http.get<any[]>(url).subscribe((response: any[]) => {
-      console.log('Autocomplete')
-      this.suggestions = response;
-      console.log(this.suggestions)
-    }, error => {
-      console.error(error);
+  constructor(private http: HttpClient) {}
+
+  auto_complete(keyword: string): void {
+    this.autocomplete?.unsubscribe();
+    this.suggestions = [];
+    if (!keyword.trim()) return;
+
+    this.autocomplete = timer(250).pipe(
+      switchMap(() => this.http.get<string[]>('/autocomplete', { params: { keyword } }))
+    ).subscribe({
+      next: suggestions => this.suggestions = suggestions,
+      error: () => this.suggestions = []
     });
   }
 
-  autoDetect() {
-    (document.getElementById('location') as HTMLInputElement).value = '';
+  autoDetect(): void {
+    this.location = '';
   }
 
-  onSubmit() {
-    this.isSubmit = true;
-    const keyword = (document.getElementById('keyword') as HTMLInputElement).value;
-    var distance = (document.getElementById('distance') as HTMLInputElement).value;
-    if (distance == '') {
-      distance = '10';
-    }
-    const category = (document.getElementById('category') as HTMLSelectElement).value;
-    const location = (document.getElementById('location') as HTMLInputElement).value;
-
-    let url = `https://advait-12334123.uw.r.appspot.com/events?keyword=${keyword}&distance=${distance}&category=${category}`;
-    this.share_details.setShowtable(true);
-    this.share_details.setShowdetails(false);
-
-    if (this.auto_detect) {
-      console.log('auto_detect is true')
-      const IPINFO_API_KEY = '[REDACTED]';
-      const IPINFO_API_URL = 'https://ipinfo.io/json';
-
-      this.http.get(`${IPINFO_API_URL}?token=${IPINFO_API_KEY}`).subscribe((data: any) => {
-        const lat = data.loc.split(',')[0];
-        const lon = data.loc.split(',')[1];
-        url += `&location=${lat},${lon}`;
-
-        axios.get(url)
-          .then(response => {
-            console.log(response.data);
-            this.events = response.data;
-            console.log(this.events);
-            this.showtable = true;
-          })
-          .catch(error => {
-            console.error(error);
-          });
-      });
-    } else {
-      url += `&location=${location}`;
-
-      axios.get(url)
-        .then(response => {
-          console.log(response.data); 
-          this.events = response.data;
-          console.log(this.events);
-          this.showtable = true;
-        })
-        .catch(error => {
-          console.error(error);
-        });
-    }
-  }
-
-  onClear(){
+  onSubmit(): void {
+    this.search?.unsubscribe();
+    this.autocomplete?.unsubscribe();
+    this.suggestions = [];
     this.events = [];
-    this.showtable = false;
-    this.showdetails = false;
-    this.share_details.setShowdetails(false);
-    this.share_details.setClickedClear(true);
+    this.status = 'loading';
+    this.error = '';
+
+    const params = {
+      keyword: this.keyword.trim(),
+      distance: this.distance ?? 10,
+      category: this.category
+    };
+
+    const location = new Observable<string>(subscriber => {
+      if (!this.auto_detect) {
+        subscriber.next(this.location.trim());
+        subscriber.complete();
+        return;
+      }
+
+      const fail = () => subscriber.error(new Error('Could not detect your location. Enter a city or ZIP code.'));
+      if (!navigator.geolocation) {
+        fail();
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(({ coords }) => {
+        subscriber.next(`${coords.latitude},${coords.longitude}`);
+        subscriber.complete();
+      }, fail, { timeout: 10000 });
+    });
+
+    this.search = location.pipe(
+      switchMap(value => this.http.get<any[]>('/events', { params: { ...params, location: value } }))
+    ).subscribe({
+      next: events => {
+        this.events = events;
+        this.status = 'success';
+      },
+      error: error => {
+        this.error = error instanceof HttpErrorResponse
+          ? error.error?.message || 'Could not search for events. Try again.'
+          : error.message;
+        this.status = 'error';
+      }
+    });
+  }
+
+  onClear(): void {
+    this.search?.unsubscribe();
+    this.autocomplete?.unsubscribe();
+    this.keyword = '';
+    this.distance = null;
+    this.category = 'default';
+    this.location = '';
+    this.auto_detect = false;
+    this.suggestions = [];
+    this.events = [];
+    this.status = 'idle';
+    this.error = '';
+  }
+
+  ngOnDestroy(): void {
+    this.search?.unsubscribe();
+    this.autocomplete?.unsubscribe();
   }
 }

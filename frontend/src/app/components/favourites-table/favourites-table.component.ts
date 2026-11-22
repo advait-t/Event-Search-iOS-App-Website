@@ -1,25 +1,27 @@
 import { Component } from '@angular/core';
-
+import { Favorite, readFavorites, writeFavorites } from '../../service/favorites';
 
 @Component({
   selector: 'app-favourites-table',
   templateUrl: './favourites-table.component.html',
   styleUrls: ['./favourites-table.component.css']
-
 })
 export class FavouritesTableComponent {
-  data: any[] = [];
+  data: Favorite[] = [];
+  error = '';
+
   ngOnInit(): void {
-    const localStorageData = localStorage.getItem('favourite_events');
-    if (localStorageData) {
-      this.data = JSON.parse(localStorageData);
-    }
+    this.data = readFavorites();
   }
 
-  removeFavourite(event: any) {
-    this.data = this.data.filter((item) => item.name !== event);
-    localStorage.setItem('favourite_events', JSON.stringify(this.data));
-    alert("Removed from favourites!");
+  removeFavourite(event: Favorite): void {
+    this.error = '';
+    const remaining = this.data.filter(item => item !== event);
+    try {
+      writeFavorites(remaining);
+      this.data = remaining;
+    } catch {
+      this.error = 'Could not remove the favorite from this device.';
+    }
   }
-  
 }

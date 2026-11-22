@@ -1,283 +1,201 @@
-
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const geohash = require('ngeohash');
+const path = require('path');
+const SpotifyWebApi = require('spotify-web-api-node');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const path = require("path");
-app.use(express.static(path.join(__dirname, "dist/web-tech-hw9")));
-
-const segmentIdDict = {
-  'music': 'KZFzniwnSyZfZ7v7nJ',
-  'sports': 'KZFzniwnSyZfZ7v7nE',
-  'art': 'KZFzniwnSyZfZ7v7na',
-  'film': 'KZFzniwnSyZfZ7v7nn',
-  'miscellaneous': 'KZFzniwnSyZfZ7v7n1'
-};
-
+const frontend = process.env.FRONTEND_DIST || path.join(__dirname, '../frontend/dist/web-tech-hw9');
+const http = axios.create({ timeout: 8000 });
 app.use(cors());
+const segments = new Map([
+  ['music', 'KZFzniwnSyZfZ7v7nJ'],
+  ['sports', 'KZFzniwnSyZfZ7v7nE'],
+  ['art', 'KZFzniwnSyZfZ7v7na'],
+  ['film', 'KZFzniwnSyZfZ7v7nn'],
+  ['miscellaneous', 'KZFzniwnSyZfZ7v7n1']
+]);
 
-app.get('/autocomplete', async (req, res) => {
-  const keyword = req.query.keyword;
-  const url = `https://app.ticketmaster.com/discovery/v2/suggest?apikey=[REDACTED]&keyword=${keyword}`;
-  console.log(url);
-
-  try {
-    const response = await axios.get(url);
-    const data = response.data;
-    const autocomplete_list = [];
-
-    // get the 5 words from the autocomplete list
-    for (let i = 0; i < 5; i++) {
-      const name = data?._embedded?.attractions?.[i]?.name || '';
-      autocomplete_list.push(name);
+function route(handler) {
+  return async (req, res) => {
+    try {
+      await handler(req, res);
+    } catch (error) {
+      // Axios errors can contain credentials in request configuration.
+      console.error('Upstream request failed', req.route.path, error.response?.status);
+      res.status(502).json({ message: 'An event data provider is temporarily unavailable.' });
     }
+  };
+}
 
-    res.status(200).send(autocomplete_list);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error retrieving autocomplete data');
-  }
-});
-
-
-app.get('/venue_details', async (req, res) => {
-  var venue_name = req.query.venue_name;
-
-  url = `https://app.ticketmaster.com/discovery/v2/venues.json?keyword=${venue_name}&apikey=[REDACTED]`;
-  console.log(url);
-  try {
-    var response = await axios.get(url);
-    var data = response.data;
-
-    var venue_dict = {};
-    // get the venue_name, address, city, state, phone number, open hours, general rule, child rule
-    venue_dict['venue_name'] = data?._embedded?.venues?.[0]?.name || '';
-    venue_dict['address'] = data?._embedded?.venues?.[0]?.address?.line1 || '';
-    venue_dict['city'] = data?._embedded?.venues?.[0]?.city?.name || '';
-    venue_dict['state'] = data?._embedded?.venues?.[0]?.state?.name || '';
-    venue_dict['postal_code'] = data?._embedded?.venues?.[0]?.postalCode || '';
-    venue_dict['phone'] = data?._embedded?.venues?.[0]?.boxOfficeInfo?.phoneNumberDetail || '';
-    venue_dict['open_hours'] = data?._embedded?.venues?.[0]?.boxOfficeInfo?.openHoursDetail || '';
-    venue_dict['general_rule'] = data?._embedded?.venues?.[0]?.generalInfo?.generalRule || '';
-    venue_dict['child_rule'] = data?._embedded?.venues?.[0]?.generalInfo?.childRule || '';
-    venue_dict['latitude'] = parseFloat(data?._embedded?.venues?.[0]?.location?.latitude) || '';
-    venue_dict['longitude'] = parseFloat(data?._embedded?.venues?.[0]?.location?.longitude) || '';
-
-    res.json(venue_dict);
-    console.log(venue_dict);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error retrieving venue data');
-  }
-})
-
-const SpotifyWebApi = require('spotify-web-api-node');
-
-app.get('/spotify_artist_info', async (req, res) => {
-  const artistName = req.query.artist_name;
-  const client_id = '[REDACTED]';
-  const client_secret = '[REDACTED]';
-
-  const spotifyApi = new SpotifyWebApi({
-    clientId: client_id,
-    clientSecret: client_secret,
+async function ticketmaster(resource, params) {
+  const apikey = process.env.TICKETMASTER_API_KEY;
+  if (!apikey) throw new Error('Missing Ticketmaster configuration');
+  const response = await http.get('https://app.ticketmaster.com/discovery/v2/' + resource, {
+    params: { ...params, apikey }
   });
+  return response.data;
+}
 
-  try {
-    const authResponse = await spotifyApi.clientCredentialsGrant();
+function query(req, name) {
+  return typeof req.query[name] === 'string' ? req.query[name].trim() : '';
+}
 
-    spotifyApi.setAccessToken(authResponse.body.access_token);
+function coordinates(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+}
 
-    const searchResult = await spotifyApi.searchArtists(artistName);
+app.get('/autocomplete', route(async (req, res) => {
+  const keyword = query(req, 'keyword');
+  if (!keyword) return res.json([]);
+  const data = await ticketmaster('suggest', { keyword });
+  const suggestions = (data._embedded?.attractions ?? []).slice(0, 5);
+  res.json(suggestions.map(artist => artist.name).filter(Boolean));
+}));
 
-    const artist = searchResult.body.artists.items[0];
-    const name = artist.name;
-    const followers = artist.followers.total.toLocaleString();
-    const popularity = artist.popularity;
-    const genres = artist.genres;
-    const artist_url = artist.external_urls.spotify;
-    const icon = artist.images[0].url;
-    const artist_id = artist.id;
-    const artist_image = artist.images[0].url;
+app.get('/venue_details', route(async (req, res) => {
+  const keyword = query(req, 'venue_name');
+  if (!keyword) return res.status(400).json({ message: 'A venue name is required.' });
+  const data = await ticketmaster('venues.json', { keyword });
+  const venue = data._embedded?.venues?.[0];
+  if (!venue) return res.status(404).json({ message: 'Venue details are unavailable.' });
+  res.json({
+    venue_name: venue.name,
+    address: venue.address?.line1,
+    city: venue.city?.name,
+    state: venue.state?.name,
+    postal_code: venue.postalCode,
+    phone: venue.boxOfficeInfo?.phoneNumberDetail,
+    open_hours: venue.boxOfficeInfo?.openHoursDetail,
+    general_rule: venue.generalInfo?.generalRule,
+    child_rule: venue.generalInfo?.childRule,
+    latitude: parseFloat(venue.location?.latitude),
+    longitude: parseFloat(venue.location?.longitude)
+  });
+}));
 
-    const albumsResult = await spotifyApi.getArtistAlbums(artist_id);
-    const albums = albumsResult.body.items;
-    const albumCovers = albums.map(album => album.images[0].url).slice(0, 3);
+app.get('/spotify_artist_info', route(async (req, res) => {
+  const artistName = query(req, 'artist_name');
+  if (!artistName) return res.status(400).json({ message: 'An artist name is required.' });
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return res.status(503).json({ message: 'Artist details are unavailable.' });
 
-    const final_json = {
-      name: name,
-      followers: followers,
-      popularity: popularity,
-      genres: genres,
-      artist_url: artist_url,
-      icon: icon,
-      artist_id: artist_id,
-      album_covers: albumCovers,
-      artist_image: artist_image
-    }
+  const spotify = new SpotifyWebApi({ clientId, clientSecret });
+  const auth = await spotify.clientCredentialsGrant();
+  spotify.setAccessToken(auth.body.access_token);
 
-    res.json(final_json);
+  const results = await spotify.searchArtists(artistName);
+  const artist = results.body.artists.items[0];
+  if (!artist) return res.status(404).json({ message: 'Artist details are unavailable.' });
 
-    console.log(final_json)
-  }
-  catch (error) {
-    console.error(error);
-    res.status(500).send('Error retrieving artist data');
-  }
-});
+  const albums = await spotify.getArtistAlbums(artist.id);
+  res.json({
+    name: artist.name,
+    followers: artist.followers?.total?.toLocaleString(),
+    popularity: artist.popularity,
+    genres: artist.genres,
+    artist_url: artist.external_urls?.spotify,
+    icon: artist.images?.[0]?.url,
+    artist_id: artist.id,
+    album_covers: albums.body.items.map(album => album.images?.[0]?.url).filter(Boolean).slice(0, 3),
+    artist_image: artist.images?.[0]?.url
+  });
+}));
 
+app.get('/event_details', route(async (req, res) => {
+  const eventId = query(req, 'event_id');
+  if (!eventId) return res.status(400).json({ message: 'An event ID is required.' });
 
-// app.get('/event_details', async (req, res) => {
-//   var event_id = req.query.event_id;
+  const data = await ticketmaster('events/' + encodeURIComponent(eventId) + '.json');
+  const artists = data._embedded?.attractions ?? [];
+  const classification = data.classifications?.[0];
+  const start = data.dates?.start;
+  res.json({
+    event_id: data.id ?? eventId,
+    artist_list: artists.map(artist => artist.name).filter(Boolean),
+    date: start?.localDate ?? '',
+    time: start?.localTime ?? '',
+    name1: data.name ?? '',
+    artist: artists[0]?.name ?? '',
+    artist_url: artists[0]?.url ?? '',
+    venue: data._embedded?.venues?.[0]?.name ?? '',
+    segment: classification?.segment?.name ?? '',
+    subgenre: classification?.subGenre?.name ?? '',
+    genre: classification?.genre?.name ?? '',
+    subtype: classification?.subType?.name ?? '',
+    type: classification?.type?.name ?? '',
+    price_min: data.priceRanges?.[0]?.min ?? '',
+    price_max: data.priceRanges?.[0]?.max ?? '',
+    ticketstatus: data.dates?.status?.code ?? '',
+    buy_ticket_at: data.url ?? '',
+    seatmap: data.seatmap?.staticUrl ?? '',
+    music_related: classification?.segment?.name ?? ''
+  });
+}));
 
-//   url = `https://app.ticketmaster.com/discovery/v2/events/${event_id}.json?apikey=[REDACTED]`;
-//   console.log(url);
-//   try {
-//     var response = await axios.get(url);
-//     var data = response.data;
-
-//     var artist_dicts = [];
-//     for (let i = 0; i < data?._embedded?.attractions?.length; i++) {
-//       var artist_name = data?._embedded?.attractions?.[i]?.name || '';
-
-//       var event_dict = {};
-//       event_dict['artist'] = artist_name;
-//       event_dict['artist_url'] = data?._embedded?.attractions?.[i]?.url || '';
-//       event_dict['date'] = data?.dates?.start?.localDate || '';
-//       event_dict['time'] = data?.dates?.start?.localTime || '';
-//       event_dict['name1'] = data?.name || '';
-//       event_dict['venue'] = data?._embedded?.venues?.[0]?.name || '';
-//       event_dict['segment'] = data?.classifications?.[0]?.segment?.name || '';
-//       event_dict['subGenre'] = data?.classifications?.[0]?.subGenre?.name || '';
-//       event_dict['genre'] = data?.classifications?.[0]?.genre?.name || '';
-//       event_dict['subType'] = data?.classifications?.[0]?.subType?.name || '';
-//       event_dict['type'] = data?.classifications?.[0]?.type?.name || '';
-//       event_dict['price_min'] = data?.priceRanges?.[0]?.min || '';
-//       event_dict['price_max'] = data?.priceRanges?.[0]?.max || '';
-//       event_dict['ticketstatus'] = data?.dates?.status?.code || '';
-//       event_dict['buy_ticket_at'] = data?.url || '';
-//       event_dict['seatmap'] = data?.seatmap?.staticUrl || '';
-
-//       artist_dicts.push(event_dict);
-//     }
-
-//     res.json(artist_dicts);
-//     console.log(artist_dicts);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).send('Error retrieving event data');
-//   }
-// });
-
-
-app.get('/event_details', async (req, res) => {
-  var event_id = req.query.event_id;
-
-  url = `https://app.ticketmaster.com/discovery/v2/events/${event_id}.json?apikey=[REDACTED]`;
-  console.log(url);
-  try {
-    var response = await axios.get(url);
-    var data = response.data;
-
-    var event_dict = {};
-    var artist_list = [];
-    for (let i = 0; i < data?._embedded?.attractions?.length; i++) {
-      var artist_name = data?._embedded?.attractions?.[i]?.name || '';
-      artist_list.push(artist_name);
-    }
-
-    event_dict['artist_list'] = artist_list;
-    event_dict['date'] = data?.dates?.start?.localDate || '';
-    event_dict['time'] = data?.dates?.start?.localTime || '';
-    event_dict['name1'] = data?.name || '';
-    event_dict['artist'] = data?._embedded?.attractions?.[0]?.name || '';
-    event_dict['artist_url'] = data?._embedded?.attractions?.[0]?.url || '';
-    event_dict['venue'] = data?._embedded?.venues?.[0]?.name || '';
-    event_dict['segment'] = data?.classifications?.[0]?.segment?.name || '';
-    event_dict['subgenre'] = data?.classifications?.[0]?.subGenre?.name || '';
-    event_dict['genre'] = data?.classifications?.[0]?.genre?.name || '';
-    event_dict['subtype'] = data?.classifications?.[0]?.subType?.name || '';
-    event_dict['type'] = data?.classifications?.[0]?.type?.name || '';
-    event_dict['price_min'] = data?.priceRanges?.[0]?.min || '';
-    event_dict['price_max'] = data?.priceRanges?.[0]?.max || '';
-    event_dict['ticketstatus'] = data?.dates?.status?.code || '';
-    event_dict['buy_ticket_at'] = data?.url || '';
-    event_dict['seatmap'] = data?.seatmap?.staticUrl || '';
-    event_dict['music_related'] = data?.classifications?.[0]?.segment?.name || '';
-
-    res.json(event_dict);
-    console.log(event_dict);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error retrieving event data');
-  }
-});
-
-
-app.get('/events', async (req, res) => {
-  const keyword = req.query.keyword;
-  const distance = req.query.distance;
-  const category = req.query.category;
-  const location1 = req.query.location;
-
-  const segmentId = segmentIdDict[category] || '';
-
-  if(location1.includes(',')){
-    try {
-      lat = location1.split(',')[0];
-      lng = location1.split(',')[1];
-      location = geohash.encode(lat, lng);
-    }
-    catch (error) {
-      location = '';
-    }
-  } 
-  else {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${location1}&key=[REDACTED]`;
-    try {
-      const response = await axios.get(url);
-      lat = response.data?.results[0].geometry?.location?.lat;
-      lng = response.data?.results[0].geometry?.location?.lng;
-      location = geohash.encode(lat, lng);
-    }
-    catch (error) {
-      location = '';
-    }
+app.get('/events', route(async (req, res) => {
+  const keyword = query(req, 'keyword');
+  const location = query(req, 'location');
+  const category = query(req, 'category');
+  const radius = Number(query(req, 'distance') || '10');
+  if (!keyword || !location || !Number.isFinite(radius) || radius <= 0 ||
+      (category && category !== 'default' && !segments.has(category)) ||
+      ['distance', 'category'].some(name => req.query[name] !== undefined && typeof req.query[name] !== 'string')) {
+    return res.status(400).json({ message: 'Enter a keyword, location, valid category, and positive distance.' });
   }
 
-  url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=[REDACTED]&keyword=${keyword}&segmentId=${segmentId}&radius=${distance}&unit=miles&geoPoint=${location}`;
-
-  console.log(url);
-
-  try {
-    const response = await axios.get(url);
-    const eventData = response.data._embedded?.events || [];
-  
-    const filteredData = eventData.map(event => {
-      return {
-        name: event?.name,
-        date: event?.dates?.start?.localDate,
-        time: event?.dates?.start?.localTime,
-        venue: event?._embedded?.venues[0]?.name,
-        icon: event?.images[0]?.url,
-        genre: event?.classifications[0]?.segment?.name,
-        event_id: event?.id,
-      };
+  let lat;
+  let lng;
+  const numericPair = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(location);
+  if (numericPair) {
+    lat = Number(numericPair[1]);
+    lng = Number(numericPair[2]);
+  } else {
+    const key = process.env.GOOGLE_GEOCODING_API_KEY;
+    if (!key) return res.status(503).json({ message: 'Location lookup is unavailable.' });
+    const { data } = await http.get('https://maps.googleapis.com/maps/api/geocode/json', {
+      params: { address: location, key }
     });
-  
-    console.log(filteredData);
-    res.json(filteredData);
-  
-  } catch (error) {
-    console.error(error);
-    res.status(500).json([]);
-  }  
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      return res.status(502).json({ message: 'Location lookup is temporarily unavailable.' });
+    }
+    lat = data.results?.[0]?.geometry?.location?.lat;
+    lng = data.results?.[0]?.geometry?.location?.lng;
+  }
+  if (!coordinates(lat, lng)) {
+    return res.status(400).json({ message: 'Location could not be resolved. Enter a city or ZIP code.' });
+  }
+
+  const data = await ticketmaster('events.json', {
+    keyword,
+    segmentId: segments.get(category),
+    radius,
+    unit: 'miles',
+    geoPoint: geohash.encode(lat, lng)
+  });
+  res.json((data._embedded?.events ?? []).map(event => ({
+    name: event.name,
+    date: event.dates?.start?.localDate,
+    time: event.dates?.start?.localTime,
+    venue: event._embedded?.venues?.[0]?.name,
+    icon: event.images?.[0]?.url,
+    genre: event.classifications?.[0]?.segment?.name,
+    event_id: event.id
+  })));
+}));
+
+app.get('/maps-config', (req, res) => {
+  // This key is public by design and must be restricted to the site's browser origins.
+  res.json({ key: process.env.GOOGLE_MAPS_BROWSER_KEY || '' });
 });
+
+app.use(express.static(frontend));
+app.get('/favourites', (req, res) => res.sendFile(path.resolve(frontend, 'index.html')));
 
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log('Server listening on port ' + port);
 });

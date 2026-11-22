@@ -18,11 +18,11 @@
         <div class="form-row">
           <div class="form-group col-md-6">
             <label for="distance">Distance</label>
-            <input type="number" id="distance" name="distance" class="form-control" placeholder="10">
+            <input type="number" min="1" id="distance" [(ngModel)]="distance" name="distance" class="form-control" placeholder="10">
           </div>
           <div class="form-group col-md-6">
             <label for="category">Category<span class="text-danger">*</span></label>
-            <select id="category" name="category" class="form-control" required>
+            <select id="category" [(ngModel)]="category" name="category" class="form-control" required>
               <option value="default">Default</option>
               <option value="music">Music</option>
               <option value="sports">Sports</option>
@@ -35,23 +35,24 @@
 
           <div class="form-group">
           <label for="location">Location<span class="text-danger">*</span></label>
-          <input type="text" id="location" name="location" class="form-control" [disabled] = "auto_detect" required>
+          <input type="text" id="location" [(ngModel)]="location" name="location" class="form-control" [disabled] = "auto_detect" required>
         </div>
 
         <div class="form-group form-check">
-          <input type="checkbox" id="auto_detect" name="auto_detect" class="form-check-input" [(ngModel)]="auto_detect" (click)="autoDetect()">
+          <input type="checkbox" id="auto_detect" name="auto_detect" class="form-check-input" [(ngModel)]="auto_detect" (ngModelChange)="autoDetect()">
           <label class="form-check-label" for="auto_detect">Auto-detect your location</label>
         </div>
 
         <div class="form-group d-flex justify-content-center">
           <button id="submit_button" type="submit" class="btn btn-danger me-2">Submit</button>
-          <button id="reset_button" type="reset" class="btn btn-primary ms-2" (click)="onClear()">Clear</button>
+          <button id="reset_button" type="button" class="btn btn-primary ms-2" (click)="onClear()">Clear</button>
         </div>
 
       </form>
     </div>
   </div>
 </div>
-<app-events-table *ngIf="events.length > 0" [showtable]="showtable" [events]="events"></app-events-table>
-
-<app-no-events-table *ngIf="events.length == 0 && isSubmit" [showtable]="showtable"></app-no-events-table>
+<p *ngIf="status === 'loading'" class="text-center text-white" role="status">Searching for events…</p>
+<p *ngIf="status === 'error'" class="alert alert-danger" role="alert">{{ error }}</p>
+<app-events-table *ngIf="events.length > 0" [events]="events"></app-events-table>
+<app-no-events-table *ngIf="status === 'success' && events.length === 0" [showtable]="true"></app-no-events-table>
