@@ -96,27 +96,26 @@
         
         <mat-tab label="Artists/Teams">
 
-          <div class="play_area" *ngIf="artist_info.length===0">
-            <div class="row">
-              <div class="col-md-12">
-                <div class="container">
-                  <table class="table table-striped table-light text-center" style="margin-left: auto; margin-right: auto; border-radius: 10px; color: red;">
-                      <thead>
-                          <tr>No music related artist details to show</tr>
-                      </thead>
-                  </table>
-                  </div>
-              </div>
-            </div>
+          <div class="play_area text-center" *ngIf="!artist_info.length">
+            <ul *ngIf="event_details.artist_list.length; else noArtists" class="list-unstyled">
+              <li *ngFor="let name of event_details.artist_list">
+                <a *ngIf="event_details.music_related === 'Music'; else artistName"
+                  [href]="spotifySearchUrl(name)" target="_blank" rel="noopener noreferrer">
+                  Search Spotify for {{ name }}
+                </a>
+                <ng-template #artistName>{{ name }}</ng-template>
+              </li>
+            </ul>
+            <ng-template #noArtists>No artists or teams are listed for this event.</ng-template>
           </div>
 
-          <carousel [showIndicators]="false" [interval]="0">
+          <carousel *ngIf="artist_info.length" [showIndicators]="false" [interval]="0">
             <slide *ngFor="let artist of artist_info">
                 <div class="play_area">
                   <div class="row">
                     <div class="col-md-3">
-                      <div class="image-wrapper">
-                        <img src="{{ artist.artist_image }}" alt=" " class="custom-icon img-fluid">
+                      <div class="image-wrapper" *ngIf="artist.artist_image">
+                        <img src="{{ artist.artist_image }}" alt="" class="custom-icon img-fluid">
                       </div>
                       <div class="description_tags">{{ artist.name }}</div>
                     </div>
@@ -141,7 +140,7 @@
                     </div>
                   </div>
                   <div class="row">
-                    <div class="album_description">Album Featuring {{ artist.name }}</div>
+                    <div *ngIf="artist.album_covers.length" class="album_description">Albums featuring {{ artist.name }}</div>
                   </div>
                   <div class="row">
                     <div class="col-md-4 text-center" *ngIf="artist.album_covers[0]">
@@ -289,32 +288,10 @@
             </div>  
           </div>
 
-          <div class="row" style="margin-top: 10px;">
-            <button type="button" class="btn btn-danger" style="width: auto; margin-left: auto; margin-right: auto;" *ngIf="venue_info?.latitude != null && venue_info?.longitude != null" [disabled]="mapLoading" (click)="openGoogleMapsModal()">Show venue on Google Maps</button>
-            <p *ngIf="mapError" role="alert">{{ mapError }}</p>
+          <div class="row justify-content-center mt-2">
+            <a *ngIf="venueMapUrl as mapUrl" [href]="mapUrl" class="btn btn-danger w-auto"
+              target="_blank" rel="noopener noreferrer">Open venue in Google Maps</a>
           </div>
-
-
-
-          <ng-template #google_maps_modal let-modal>
-            <div class="modal-header">
-              <h4 class="modal-title">Event Venue</h4>
-            </div>
-            <div class="modal-body">
-              <div class="google_maps_container">
-                <div class="my-google-map">
-                  <google-map [width]="'100%'" [center]="{ lat: this.venue_info.latitude, lng: this.venue_info.longitude }">
-                    <map-marker [position]="{ lat: this.venue_info.latitude, lng: this.venue_info.longitude }"></map-marker>
-                  </google-map>
-                </div>
-            </div>
-          </div>
-            <div class="modal-footer">
-              <div class="col-md-12">
-                <button type="button" class="btn btn-dark" (click)="modal.dismiss()">Close</button>
-              </div>    
-            </div>
-          </ng-template>
 
         </div>
         </mat-tab>        

@@ -9,7 +9,6 @@ Install the locked dependencies with `npm ci` in both `backend` and `frontend`. 
 | `TICKETMASTER_API_KEY` | Event search, autocomplete, and event and venue details |
 | `GOOGLE_GEOCODING_API_KEY` | Server-side lookups for city names and ZIP codes |
 | `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` | Optional artist details |
-| `GOOGLE_MAPS_BROWSER_KEY` | Optional venue maps. Use a separate browser key with HTTP referrer and Maps JavaScript API restrictions. |
 
 Run `npm start` from `backend`, then run `npm start` from `frontend` and open `http://localhost:4200`. The Angular development server proxies API requests to Express on port 3000. Automatic location uses browser geolocation and requires permission. Outside localhost, serve the site over HTTPS to use it.
 
@@ -21,7 +20,7 @@ The GitHub Actions workflow builds PRs and pushes targeting `recovered-web-basel
 
 - Configure Google Workload Identity Federation for the GitHub repository and restrict the provider to this repository ID and `refs/heads/recovered-web-baseline`. Grant the deploy service account App Engine deployment and traffic promotion permissions, Cloud Build and staging bucket access, and Service Account User on the runtime identity.
 - Set repository variables `GCP_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, and `GCP_DEPLOY_SERVICE_ACCOUNT`. Restrict the `app-engine-production` GitHub environment to the deployment branch.
-- Set `TICKETMASTER_API_KEY` and `GOOGLE_GEOCODING_API_KEY` as environment secrets. The browser Maps key and Spotify credentials are optional environment secrets. The deploy action passes these values to App Engine as runtime environment variables.
+- Set `TICKETMASTER_API_KEY` and `GOOGLE_GEOCODING_API_KEY` as environment secrets. Spotify credentials are optional environment secrets. Venue links open Google Maps without an API key. The deploy action passes these values to App Engine as runtime environment variables.
 - Set repository variable `APP_ENGINE_DEPLOY_ENABLED` to `true` when the project and credentials are ready. The next merge will send production traffic to the new version.
 
 ## Location suggestions

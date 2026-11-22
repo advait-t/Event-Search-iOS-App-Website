@@ -119,11 +119,17 @@ app.get('/spotify_artist_info', route(async (req, res) => {
   const auth = await spotify.clientCredentialsGrant();
   spotify.setAccessToken(auth.body.access_token);
 
-  const results = await spotify.searchArtists(artistName);
+  const results = await spotify.searchArtists(artistName, { limit: 1 });
   const artist = results.body.artists.items[0];
   if (!artist) return res.status(404).json({ message: 'Artist details are unavailable.' });
 
-  const albums = await spotify.getArtistAlbums(artist.id);
+  let albumCovers = [];
+  try {
+    const albums = await spotify.getArtistAlbums(artist.id, { limit: 3 });
+    albumCovers = (albums.body.items ?? []).map(album => album.images?.[0]?.url).filter(Boolean);
+  } catch (error) {
+    console.error('Spotify album lookup unavailable', error.statusCode);
+  }
   res.json({
     name: artist.name,
     followers: artist.followers?.total?.toLocaleString(),
@@ -132,7 +138,7 @@ app.get('/spotify_artist_info', route(async (req, res) => {
     artist_url: artist.external_urls?.spotify,
     icon: artist.images?.[0]?.url,
     artist_id: artist.id,
-    album_covers: albums.body.items.map(album => album.images?.[0]?.url).filter(Boolean).slice(0, 3),
+    album_covers: albumCovers,
     artist_image: artist.images?.[0]?.url
   });
 }));
