@@ -4,5 +4,6 @@
   "/event_details": { "target": "http://localhost:3000" },
   "/venue_details": { "target": "http://localhost:3000" },
   "/spotify_artist_info": { "target": "http://localhost:3000" },
-  "/maps-config": { "target": "http://localhost:3000" }
+  "/maps-config": { "target": "http://localhost:3000" },
+  "/location_label": { "target": "http://localhost:3000" }
 }

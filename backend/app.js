@@ -51,6 +51,34 @@ function coordinates(lat, lng) {
     Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
 
+function parseCoordinates(value) {
+  const match = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(value);
+  return match && [Number(match[1]), Number(match[2])];
+}
+
+app.get('/location_label', route(async (req, res) => {
+  const position = parseCoordinates(query(req, 'location'));
+  if (!position || !coordinates(...position)) {
+    return res.status(400).json({ message: 'Valid coordinates are required.' });
+  }
+
+  const key = process.env.GOOGLE_GEOCODING_API_KEY;
+  if (!key) return res.json({ label: '' });
+
+  const { data } = await http.get('https://maps.googleapis.com/maps/api/geocode/json', {
+    params: {
+      latlng: position.map(value => value.toFixed(2)).join(','),
+      result_type: 'locality|postal_town|administrative_area_level_2',
+      key
+    }
+  });
+  const parts = data.results?.[0]?.address_components ?? [];
+  const part = (...types) => parts.find(component => types.some(type => component.types.includes(type)));
+  const city = part('locality', 'postal_town', 'administrative_area_level_2')?.long_name;
+  const region = part('administrative_area_level_1')?.short_name ?? part('country')?.short_name;
+  res.json({ label: city ? [city, region].filter(Boolean).join(', ') : '' });
+}));
+
 app.get('/autocomplete', route(async (req, res) => {
   const keyword = query(req, 'keyword');
   if (!keyword) return res.json([]);
@@ -153,10 +181,9 @@ app.get('/events', route(async (req, res) => {
 
   let lat;
   let lng;
-  const numericPair = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(location);
-  if (numericPair) {
-    lat = Number(numericPair[1]);
-    lng = Number(numericPair[2]);
+  const position = parseCoordinates(location);
+  if (position) {
+    [lat, lng] = position;
   } else {
     const key = process.env.GOOGLE_GEOCODING_API_KEY;
     if (!key) return res.status(503).json({ message: 'Location lookup is unavailable.' });

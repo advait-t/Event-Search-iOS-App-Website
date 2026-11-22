@@ -16,12 +16,17 @@ export class EventSsearchCardComponent implements OnDestroy {
   distance: number | null = null;
   category = 'default';
   location = '';
+  locating = false;
+  locationError = '';
   status: 'idle' | 'loading' | 'success' | 'error' = 'idle';
   error = '';
 
   private search?: Subscription;
   private autocomplete?: Subscription;
   private cityRequest?: Subscription;
+  private detection = new Subscription();
+  private detectedCoordinates = '';
+  private manualLocation = '';
   private cities?: { label: string; searchable: string }[];
 
   constructor(private http: HttpClient) {}
@@ -72,12 +77,56 @@ export class EventSsearchCardComponent implements OnDestroy {
       .replace(/[,.]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  autoDetect(): void {
-    this.location = '';
+  autoDetect(enabled: boolean): void {
+    this.detection.unsubscribe();
+    this.detection = new Subscription();
+    this.auto_detect = enabled;
+    this.detectedCoordinates = '';
+    this.locationError = '';
     this.locationSuggestions = [];
+    this.locating = enabled;
+
+    if (!enabled) {
+      this.location = this.manualLocation;
+      return;
+    }
+
+    this.manualLocation = this.location;
+    this.location = '';
+
+    const position = new Observable<GeolocationCoordinates>(subscriber => {
+      const fail = () => subscriber.error(new Error('Location unavailable'));
+      if (!navigator.geolocation) {
+        fail();
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(({ coords }) => {
+        subscriber.next(coords);
+        subscriber.complete();
+      }, fail, { timeout: 10000 });
+    });
+
+    this.detection.add(position.subscribe({
+      next: ({ latitude, longitude }) => {
+        this.detectedCoordinates = `${latitude},${longitude}`;
+        this.location = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+        this.locating = false;
+        const location = this.location;
+        this.detection.add(this.http.get<{ label: string }>('/location_label', { params: { location } }).subscribe({
+          next: ({ label }) => { if (label) this.location = label; },
+          error: () => {} // Coordinates are already displayed and can be used for search.
+        }));
+      },
+      error: () => {
+        this.autoDetect(false);
+        this.locationError = 'Could not detect your location. Enter a city or ZIP code.';
+      }
+    }));
   }
 
   onSubmit(): void {
+    if (this.locating) return;
+
     this.search?.unsubscribe();
     this.autocomplete?.unsubscribe();
     this.suggestions = [];
@@ -88,30 +137,11 @@ export class EventSsearchCardComponent implements OnDestroy {
     const params = {
       keyword: this.keyword.trim(),
       distance: this.distance ?? 10,
-      category: this.category
+      category: this.category,
+      location: this.auto_detect ? this.detectedCoordinates : this.location.trim()
     };
 
-    const location = new Observable<string>(subscriber => {
-      if (!this.auto_detect) {
-        subscriber.next(this.location.trim());
-        subscriber.complete();
-        return;
-      }
-
-      const fail = () => subscriber.error(new Error('Could not detect your location. Enter a city or ZIP code.'));
-      if (!navigator.geolocation) {
-        fail();
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(({ coords }) => {
-        subscriber.next(`${coords.latitude},${coords.longitude}`);
-        subscriber.complete();
-      }, fail, { timeout: 10000 });
-    });
-
-    this.search = location.pipe(
-      switchMap(value => this.http.get<any[]>('/events', { params: { ...params, location: value } }))
-    ).subscribe({
+    this.search = this.http.get<any[]>('/events', { params }).subscribe({
       next: events => {
         this.events = events;
         this.status = 'success';
@@ -126,6 +156,8 @@ export class EventSsearchCardComponent implements OnDestroy {
   }
 
   onClear(): void {
+    this.autoDetect(false);
+    this.manualLocation = '';
     this.search?.unsubscribe();
     this.autocomplete?.unsubscribe();
     this.keyword = '';
@@ -141,6 +173,7 @@ export class EventSsearchCardComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.detection.unsubscribe();
     this.cityRequest?.unsubscribe();
     this.search?.unsubscribe();
     this.autocomplete?.unsubscribe();
