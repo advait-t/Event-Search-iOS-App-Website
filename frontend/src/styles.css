@@ -1,14 +1,45 @@
-/* You can add global styles to this file, and also import other style files */
-
 @import "~bootstrap/dist/css/bootstrap.min.css";
 @import "~@angular/material/prebuilt-themes/indigo-pink.css";
 @import "~@angular/cdk/overlay-prebuilt.css";
 
+:root {
+  color-scheme: dark;
+  --page: #101017;
+  --surface: #1a1925;
+  --line: #ffffff25;
+  --text: #fbf8ff;
+  --muted: #cbc4da;
+  --accent: #d9c2ff;
+  --ink: #24113e;
+}
+
 body {
-    background-image: url('../src/assets/background.jpg');
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: cover;
-    height: 100%;
-    background-attachment: fixed;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background: linear-gradient(180deg, #10101759, var(--page) 34rem),
+    url('./assets/background.jpg') center top / auto 37rem no-repeat, var(--page);
+  font-family: 'Avenir Next', system-ui, sans-serif;
+}
+
+main {
+  width: min(100% - 2rem, 65rem);
+  margin-inline: auto;
+  padding-block: 2.5rem 4rem;
+}
+
+h1, h2, h3 { color: var(--text); }
+a { color: var(--accent); }
+a:hover { color: #f1e5ff; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  main { padding-block: 1.75rem calc(6.5rem + env(safe-area-inset-bottom)); }
+}
+
+app-details-card .mat-mdc-tab-header {
+  --mdc-tab-indicator-active-indicator-color: var(--accent);
+  --mat-tab-header-active-label-text-color: var(--text);
+  --mat-tab-header-inactive-label-text-color: var(--muted);
+  border-bottom: 1px solid var(--line);
 }
