@@ -37,19 +37,21 @@
           <label for="location">Location<span class="text-danger">*</span></label>
           <input type="text" id="location" [ngModel]="location" (ngModelChange)="updateLocation($event)"
             name="location" class="form-control" matInput [matAutocomplete]="locationAuto"
-            [disabled]="auto_detect" autocomplete="off" required>
+            [disabled]="auto_detect" [placeholder]="locating ? 'Detecting location…' : ''" autocomplete="off" required>
           <mat-autocomplete #locationAuto="matAutocomplete">
             <mat-option *ngFor="let city of locationSuggestions" [value]="city">{{ city }}</mat-option>
           </mat-autocomplete>
+          <p *ngIf="locating" class="text-white" role="status">Detecting your location…</p>
+          <p *ngIf="locationError" class="alert alert-warning" role="alert">{{ locationError }}</p>
         </div>
 
         <div class="form-group form-check">
-          <input type="checkbox" id="auto_detect" name="auto_detect" class="form-check-input" [(ngModel)]="auto_detect" (ngModelChange)="autoDetect()">
+          <input type="checkbox" id="auto_detect" name="auto_detect" class="form-check-input" [ngModel]="auto_detect" (ngModelChange)="autoDetect($event)">
           <label class="form-check-label" for="auto_detect">Auto-detect your location</label>
         </div>
 
         <div class="form-group d-flex justify-content-center">
-          <button id="submit_button" type="submit" class="btn btn-danger me-2">Submit</button>
+          <button id="submit_button" type="submit" [disabled]="locating" class="btn btn-danger me-2">Submit</button>
           <button id="reset_button" type="button" class="btn btn-primary ms-2" (click)="onClear()">Clear</button>
         </div>
 
