@@ -20,7 +20,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { FavouritesTableComponent } from './components/favourites-table/favourites-table.component';
 import { NoEventsTableComponent } from './components/no-events-table/no-events-table.component';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { GoogleMapsModule } from '@angular/google-maps'
 import { MdbCarouselModule } from 'mdb-angular-ui-kit/carousel';
 import { CarouselModule } from 'ngx-bootstrap/carousel';
 
@@ -48,7 +47,6 @@ import { CarouselModule } from 'ngx-bootstrap/carousel';
     NgbTypeaheadModule,
     MatProgressSpinnerModule,
     NgbModule,
-    GoogleMapsModule,
     MdbCarouselModule,
     CarouselModule.forRoot()
   ],
