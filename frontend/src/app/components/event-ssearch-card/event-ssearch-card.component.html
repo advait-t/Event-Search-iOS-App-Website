@@ -35,7 +35,12 @@
 
           <div class="form-group">
           <label for="location">Location<span class="text-danger">*</span></label>
-          <input type="text" id="location" [(ngModel)]="location" name="location" class="form-control" [disabled] = "auto_detect" required>
+          <input type="text" id="location" [ngModel]="location" (ngModelChange)="updateLocation($event)"
+            name="location" class="form-control" matInput [matAutocomplete]="locationAuto"
+            [disabled]="auto_detect" autocomplete="off" required>
+          <mat-autocomplete #locationAuto="matAutocomplete">
+            <mat-option *ngFor="let city of locationSuggestions" [value]="city">{{ city }}</mat-option>
+          </mat-autocomplete>
         </div>
 
         <div class="form-group form-check">
