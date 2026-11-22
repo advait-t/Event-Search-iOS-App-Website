@@ -7,7 +7,10 @@ const SpotifyWebApi = require('spotify-web-api-node');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const frontend = process.env.FRONTEND_DIST || path.join(__dirname, '../frontend/dist/web-tech-hw9');
+const frontend = process.env.FRONTEND_DIST || path.join(
+  __dirname,
+  process.env.GAE_ENV === 'standard' ? 'dist/web-tech-hw9' : '../frontend/dist/web-tech-hw9'
+);
 const http = axios.create({ timeout: 8000 });
 app.use(cors());
 const segments = new Map([

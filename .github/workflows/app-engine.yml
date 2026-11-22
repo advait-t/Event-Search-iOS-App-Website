@@ -1,0 +1,88 @@
+name: App Engine
+
+on:
+  pull_request:
+    branches: [recovered-web-baseline]
+  push:
+    branches: [recovered-web-baseline]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '18.20.8'
+          package-manager-cache: false
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - name: Package App Engine service
+        run: |
+          mkdir -p app-engine/dist
+          cp backend/app.js backend/app.yaml backend/package.json backend/package-lock.json app-engine/
+          cp -R frontend/dist/web-tech-hw9 app-engine/dist/
+          node --check app-engine/app.js
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: app-engine-service
+          path: app-engine/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to App Engine
+    needs: build
+    if: github.event_name == 'push' && vars.APP_ENGINE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: app-engine-production
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: app-engine-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-engine-service
+          path: app-engine
+      - name: Validate deployment configuration
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          GOOGLE_GEOCODING_API_KEY: ${{ secrets.GOOGLE_GEOCODING_API_KEY }}
+        run: |
+          for name in PROJECT_ID IDENTITY_PROVIDER DEPLOY_SERVICE_ACCOUNT TICKETMASTER_API_KEY GOOGLE_GEOCODING_API_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing deployment setting: $name"
+              exit 1
+            fi
+          done
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/deploy-appengine@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          working_directory: app-engine
+          version: git-${{ github.run_id }}-${{ github.run_attempt }}
+          promote: true
+          env_vars: |-
+            TICKETMASTER_API_KEY=${{ secrets.TICKETMASTER_API_KEY }}
+            GOOGLE_GEOCODING_API_KEY=${{ secrets.GOOGLE_GEOCODING_API_KEY }}
+            GOOGLE_MAPS_BROWSER_KEY=${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
+            SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
+            SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
