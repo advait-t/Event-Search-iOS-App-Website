@@ -1,3 +1,4 @@
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { EventSsearchCardComponent } from './event-ssearch-card.component';
@@ -8,6 +9,7 @@ describe('EventSsearchCardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
+      imports: [ HttpClientTestingModule ],
       declarations: [ EventSsearchCardComponent ]
     })
     .compileComponents();

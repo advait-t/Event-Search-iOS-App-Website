@@ -1,114 +1,100 @@
-import { Component, Input, OnInit, TemplateRef, ViewChild} from '@angular/core';
-import { Output, EventEmitter } from '@angular/core';
-import { SharedShowdetailsService } from '../../service/shared-showdetails.service';
-import { NgbModal, NgbModalOptions } from '@ng-bootstrap/ng-bootstrap';
+import { Component, EventEmitter, Input, OnDestroy, Output, TemplateRef, ViewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { firstValueFrom } from 'rxjs';
+import { Favorite, matchesFavorite, readFavorites, writeFavorites } from '../../service/favorites';
 
+let mapsScript: Promise<void> | undefined;
 
 @Component({
   selector: 'app-details-card',
   templateUrl: './details-card.component.html',
   styleUrls: ['./details-card.component.css']
 })
-export class DetailsCardComponent {
-  @Input() showdetails: boolean = true;
+export class DetailsCardComponent implements OnDestroy {
   @Input() event_details: any;
-  @Input() clear: boolean = false;
   @Input() artist_info: any;
   @Input() venue_info: any;
-  @Output() showdetailsChange = new EventEmitter<boolean>();
-  @Output() showtableChange = new EventEmitter<boolean>();
-  showtable:any =false;
-  html_string: any;
-  favourite_events: any[] = [];
-  google_map_toggle: boolean = false;
-  lat: any;
-  lng: any;
-  marker: google.maps.LatLngLiteral[] = [];
-  carousel: any;
+  @Output() closed = new EventEmitter<void>();
+  mapLoading = false;
+  mapError = '';
+  favoriteError = '';
+  private destroyed = false;
   showMore1: boolean = false;
   showMore2: boolean = false;
   showMore3: boolean = false;
   
-  constructor(private share_details:SharedShowdetailsService, private modalService: NgbModal) { 
-  }
+  constructor(private http: HttpClient, private modalService: NgbModal) {}
 
   @ViewChild('google_maps_modal') google_maps_modal!: TemplateRef<any>;
 
+  async openGoogleMapsModal(): Promise<void> {
+    this.mapLoading = true;
+    this.mapError = '';
+    try {
+      mapsScript ??= this.loadMaps().catch(error => {
+        mapsScript = undefined;
+        throw error;
+      });
+      await mapsScript;
+      if (!this.destroyed) this.modalService.open(this.google_maps_modal, { backdrop: false });
+    } catch {
+      this.mapError = 'The venue map is unavailable.';
+    } finally {
+      this.mapLoading = false;
+    }
+  }
 
-  openGoogleMapsModal() {
-    const options_modal: NgbModalOptions = {backdrop: false}
-    const modalRef = this.modalService.open(this.google_maps_modal, options_modal);
-    this.lat = this.venue_info.latitude;
-    this.lng = this.venue_info.longitude;
+  private async loadMaps(): Promise<void> {
+    const { key } = await firstValueFrom(this.http.get<{ key: string }>('/maps-config'));
+    if (!key) throw new Error('Missing browser Maps configuration');
+
+    const script = document.createElement('script');
+    const url = new URL('https://maps.googleapis.com/maps/api/js');
+    url.searchParams.set('key', key);
+    script.src = url.toString();
+
+    return new Promise<void>((resolve, reject) => {
+      script.onload = () => resolve();
+      script.onerror = () => {
+        script.remove();
+        reject(new Error('Maps script failed to load'));
+      };
+      document.head.append(script);
+    });
   }
 
   toggleFavorite(): void {
-    const favEvent = {
+    const favorite: Favorite = {
+      event_id: this.event_details.event_id,
       name: this.event_details.name1,
       genre: this.event_details.genre,
       date: this.event_details.date,
+      time: this.event_details.time,
       venue: this.event_details.venue,
       segment: this.event_details.segment,
       subgenre: this.event_details.subgenre,
       type: this.event_details.type,
       subtype: this.event_details.subtype
     };
-    
-  
-    const existingFavEvents = localStorage.getItem('favourite_events') || "";
-    let favEventsArray = [];
-    if (existingFavEvents.length > 0) {
-      favEventsArray = JSON.parse(existingFavEvents);
-      let flag = false;
-      for(let i=0; i<favEventsArray.length; i++) {
-        if(favEventsArray[i].name === favEvent.name) {
-          flag = true;
-          break;
-        }
-      }    
-      if(!flag) {
-        favEventsArray.push(favEvent);
-        localStorage.setItem('favourite_events', JSON.stringify(favEventsArray));
-        this.event_details.isFav = true;
-        alert("Event added to favourites!");
-      } 
-      else {
-        this.event_details.isFav = false;
-        favEventsArray = favEventsArray.filter((item:any) => item.name !== favEvent.name);
-        localStorage.setItem('favourite_events', JSON.stringify(favEventsArray));
-        alert("Removed from favourites!");
-      }
-    } else {
-      favEventsArray.push(favEvent);
-      localStorage.setItem('favourite_events', JSON.stringify(favEventsArray));
-    }
-   
-    console.log("favEventsArray String", JSON.stringify(favEventsArray));
-    console.log('FAVOURITE', JSON.parse(localStorage.getItem('favourite_events') || ""));
-  }
 
-
-  ngDoCheck(){
-    if(this.share_details.getClickedClear() == true){
-      this.showdetails = false;
-      this.share_details.setClickedClear(false);
-      console.log('clear is now '  +  this.share_details.getClickedClear());
-    }
-    if(true){
-      this.showdetails= this.share_details.getShowdetails();
+    this.favoriteError = '';
+    try {
+      const saved = readFavorites();
+      const remaining = saved.filter(item => !matchesFavorite(item, favorite));
+      const adding = remaining.length === saved.length;
+      writeFavorites(adding ? [...saved, favorite] : remaining);
+      this.event_details.isFav = adding;
+    } catch {
+      this.favoriteError = 'Could not update favorites on this device.';
     }
   }
 
-  goBack() {
-    this.showdetails = false;
-    this.showtable  = true;
-    this.showtableChange.emit(this.showtable);
-    this.showdetailsChange.emit(this.showdetails);
-    this.event_details = [];
-    this.artist_info = [];
-    this.share_details.setShowdetails(false);
-    this.showMore1 = false;
-    this.showMore2 = false;
-    this.showMore3 = false;
+  ngOnDestroy(): void {
+    this.destroyed = true;
+  }
+
+  goBack(): void {
+    this.closed.emit();
   }
 }
