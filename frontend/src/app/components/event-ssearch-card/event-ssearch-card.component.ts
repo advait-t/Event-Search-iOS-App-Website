@@ -11,6 +11,7 @@ export class EventSsearchCardComponent implements OnDestroy {
   auto_detect = false;
   events: any[] = [];
   suggestions: string[] = [];
+  locationSuggestions: string[] = [];
   keyword = '';
   distance: number | null = null;
   category = 'default';
@@ -20,6 +21,8 @@ export class EventSsearchCardComponent implements OnDestroy {
 
   private search?: Subscription;
   private autocomplete?: Subscription;
+  private cityRequest?: Subscription;
+  private cities?: { label: string; searchable: string }[];
 
   constructor(private http: HttpClient) {}
 
@@ -36,8 +39,42 @@ export class EventSsearchCardComponent implements OnDestroy {
     });
   }
 
+  updateLocation(value: string): void {
+    this.location = value;
+    this.updateLocationSuggestions();
+
+    if (this.auto_detect || this.normalizeLocation(value).length < 2 || this.cities ||
+        (this.cityRequest && !this.cityRequest.closed)) return;
+
+    this.cityRequest = this.http.get<string[]>('assets/location-cities.json').subscribe({
+      next: cities => {
+        this.cities = cities.map(label => ({ label, searchable: this.normalizeLocation(label) }));
+        this.updateLocationSuggestions();
+      },
+      error: () => this.locationSuggestions = []
+    });
+  }
+
+  private updateLocationSuggestions(): void {
+    const prefix = this.normalizeLocation(this.location);
+    this.locationSuggestions = [];
+    if (!this.cities || this.auto_detect || prefix.length < 2) return;
+
+    for (const city of this.cities) {
+      if (!city.searchable.startsWith(prefix)) continue;
+      this.locationSuggestions.push(city.label);
+      if (this.locationSuggestions.length === 8) break;
+    }
+  }
+
+  private normalizeLocation(value: string): string {
+    return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+      .replace(/[,.]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
   autoDetect(): void {
     this.location = '';
+    this.locationSuggestions = [];
   }
 
   onSubmit(): void {
@@ -95,6 +132,7 @@ export class EventSsearchCardComponent implements OnDestroy {
     this.distance = null;
     this.category = 'default';
     this.location = '';
+    this.locationSuggestions = [];
     this.auto_detect = false;
     this.suggestions = [];
     this.events = [];
@@ -103,6 +141,7 @@ export class EventSsearchCardComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cityRequest?.unsubscribe();
     this.search?.unsubscribe();
     this.autocomplete?.unsubscribe();
   }

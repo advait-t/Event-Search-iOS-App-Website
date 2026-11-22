@@ -18,11 +18,12 @@
 
     <div class="row">
       <p *ngIf="favoriteError" role="alert">{{ favoriteError }}</p>
-      <div class="heading">{{ event_details.name1 }}
-        <button type="button" class="fa-stack btn p-0 border-0" aria-label="Favorite event" [attr.aria-pressed]="event_details.isFav" (click)="toggleFavorite()">
-          <i class="fas fa-circle fa-stack-2x" style="color: white;"></i>
-          <i class="far fa-heart fa-stack-1x" [ngClass]="{'text-black': !event_details.isFav}" *ngIf="!event_details.isFav"></i>
-          <i class="fas fa-heart fa-stack-1x" [ngClass]="{'text-danger': event_details.isFav}" *ngIf="event_details.isFav"></i>
+      <div class="heading">
+        <span class="event-title">{{ event_details.name1 }}</span>
+        <button type="button" class="favorite-button" aria-label="Favorite event"
+          [attr.aria-pressed]="event_details.isFav" (click)="toggleFavorite()">
+          <i class="favorite-icon fa-heart" [class.fas]="event_details.isFav"
+            [class.far]="!event_details.isFav" aria-hidden="true"></i>
         </button>
       </div>
       

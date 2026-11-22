@@ -23,3 +23,10 @@ The GitHub Actions workflow builds PRs and pushes targeting `recovered-web-basel
 - Set repository variables `GCP_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, and `GCP_DEPLOY_SERVICE_ACCOUNT`. Restrict the `app-engine-production` GitHub environment to the deployment branch.
 - Set `TICKETMASTER_API_KEY` and `GOOGLE_GEOCODING_API_KEY` as environment secrets. The browser Maps key and Spotify credentials are optional environment secrets. The deploy action passes these values to App Engine as runtime environment variables.
 - Set repository variable `APP_ENGINE_DEPLOY_ENABLED` to `true` when the project and credentials are ready. The next merge will send production traffic to the new version.
+
+## Location suggestions
+
+The bundled city list is adapted from [GeoNames](https://www.geonames.org/export/)
+under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). It includes U.S.
+entries from the cities15000 extract, international cities with at least 100,000
+residents, and national capitals. Suggestions are ranked by population.
