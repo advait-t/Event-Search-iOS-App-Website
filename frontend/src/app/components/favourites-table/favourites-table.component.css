@@ -1,14 +1,22 @@
-  .container {
-    max-width: 800px;
-    margin: 10px auto;
-    padding: 10px;
-    overflow-x: auto;
-    color: white;
-  }
-  
-  .table {
-    margin: 0 auto; 
-    border-radius: 10px;
-  }
-  
-  
+.saved-events { max-width: 42rem; margin-inline: auto; }
+h1 { margin-bottom: 1.5rem; font-weight: 750; letter-spacing: -0.04em; }
+ul { list-style: none; display: grid; gap: 0.75rem; margin: 0; padding: 0; }
+li, .empty {
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.saved-event { display: grid; gap: 0.15rem; overflow-wrap: anywhere; min-width: 0; }
+.saved-date { color: var(--accent); }
+.saved-venue, .empty { color: var(--muted); }
+button {
+  min-height: 44px;
+  padding-inline: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: #2c283b;
+  color: var(--text);
+}
+button:hover { border-color: var(--accent); }

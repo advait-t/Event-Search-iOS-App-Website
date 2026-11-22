@@ -1,13 +1,9 @@
-<div class="container">
-  <div class="card">
-    <div class="card-header text-center">
-      <h3 class="mb-0">Events Search</h3>
-    </div>
-    <div class="card-body">
+<section class="search-panel" aria-labelledby="search-heading">
+  <h1 id="search-heading">Find your next event</h1>
       <form id="event_form" (ngSubmit)="onSubmit()" ngNativeValidate>
         <div class="form-group">
-          <label for="keyword">Keyword<span class="text-danger">*</span></label>
-          <input type="text" id="keyword" name="keyword" class="form-control" matInput [(ngModel)]="keyword" (input)="auto_complete(keyword)" [matAutocomplete]="auto"  required>
+          <label for="keyword">Artist, team, or event</label>
+          <input type="text" id="keyword" name="keyword" class="form-control" placeholder="e.g. Coachella" matInput [(ngModel)]="keyword" (input)="auto_complete(keyword)" [matAutocomplete]="auto"  required>
           <mat-autocomplete #auto="matAutocomplete">
             <mat-option *ngFor="let suggestion of suggestions" [value]="suggestion">
               {{ suggestion }}
@@ -17,13 +13,13 @@
 
         <div class="form-row">
           <div class="form-group col-md-6">
-            <label for="distance">Distance</label>
+            <label for="distance">Distance (miles)</label>
             <input type="number" min="1" id="distance" [(ngModel)]="distance" name="distance" class="form-control" placeholder="10">
           </div>
           <div class="form-group col-md-6">
-            <label for="category">Category<span class="text-danger">*</span></label>
+            <label for="category">Category</label>
             <select id="category" [(ngModel)]="category" name="category" class="form-control" required>
-              <option value="default">Default</option>
+              <option value="default">All categories</option>
               <option value="music">Music</option>
               <option value="sports">Sports</option>
               <option value="art">Art</option>
@@ -34,10 +30,10 @@
         </div>
 
           <div class="form-group">
-          <label for="location">Location<span class="text-danger">*</span></label>
+          <label for="location">Location</label>
           <input type="text" id="location" [ngModel]="location" (ngModelChange)="updateLocation($event)"
             name="location" class="form-control" matInput [matAutocomplete]="locationAuto"
-            [disabled]="auto_detect" [placeholder]="locating ? 'Detecting location…' : ''" autocomplete="off" required>
+            [disabled]="auto_detect" [placeholder]="locating ? 'Detecting location…' : 'City or ZIP code'" autocomplete="off" required>
           <mat-autocomplete #locationAuto="matAutocomplete">
             <mat-option *ngFor="let city of locationSuggestions" [value]="city">{{ city }}</mat-option>
           </mat-autocomplete>
@@ -50,15 +46,13 @@
           <label class="form-check-label" for="auto_detect">Auto-detect your location</label>
         </div>
 
-        <div class="form-group d-flex justify-content-center">
-          <button id="submit_button" type="submit" [disabled]="locating" class="btn btn-danger me-2">Submit</button>
-          <button id="reset_button" type="button" class="btn btn-primary ms-2" (click)="onClear()">Clear</button>
+        <div class="search-actions">
+          <button id="submit_button" type="submit" [disabled]="locating" class="search-submit">Search events</button>
+          <button id="reset_button" type="button" class="search-clear" (click)="onClear()">Clear</button>
         </div>
 
       </form>
-    </div>
-  </div>
-</div>
+</section>
 <p *ngIf="status === 'loading'" class="text-center text-white" role="status">Searching for events…</p>
 <p *ngIf="status === 'error'" class="alert alert-danger" role="alert">{{ error }}</p>
 <app-events-table *ngIf="events.length > 0" [events]="events"></app-events-table>

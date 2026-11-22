@@ -1,4 +1,4 @@
-import { Component, Input, OnDestroy } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, forkJoin, Observable, of, Subscription } from 'rxjs';
 import { matchesFavorite, readFavorites } from '../../service/favorites';
@@ -18,6 +18,24 @@ export class EventsTableComponent implements OnDestroy {
   error = '';
 
   private request = new Subscription();
+  private activeEventId = '';
+
+  @ViewChild('detailRegion') set detailRegion(region: ElementRef<HTMLElement> | undefined) {
+    if (region) requestAnimationFrame(() => {
+      if (region.nativeElement.isConnected) region.nativeElement.focus();
+    });
+  }
+
+  @ViewChild('resultRegion') set resultRegion(region: ElementRef<HTMLElement> | undefined) {
+    if (!region || !this.activeEventId) return;
+    const eventId = this.activeEventId;
+    this.activeEventId = '';
+    requestAnimationFrame(() => {
+      const trigger = Array.from(region.nativeElement.querySelectorAll<HTMLButtonElement>('[data-event-id]'))
+        .find(button => button.dataset['eventId'] === eventId);
+      trigger?.focus();
+    });
+  }
 
   constructor(private http: HttpClient) {}
 
@@ -27,6 +45,7 @@ export class EventsTableComponent implements OnDestroy {
 
     this.request.add(this.http.get<any>('/event_details', { params: { event_id: eventId } }).subscribe({
       next: details => {
+        this.activeEventId = eventId;
         this.eventDetails = details;
         details.isFav = readFavorites().some(saved => matchesFavorite(saved, {
           event_id: details.event_id,

@@ -1,17 +1,71 @@
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-    color: white;
-  }
-
-.card {
-    background-color: rgba(255, 255, 255,0.15);
-    backdrop-filter: blur(7px);
+.search-panel {
+  max-width: 42rem;
+  padding: clamp(1.25rem, 4vw, 2.25rem);
+  margin: 0 auto 2rem;
+  border: 1px solid var(--line);
+  border-radius: 1.75rem;
+  background: #1a1925f5;
+  box-shadow: 0 24px 60px #08061065;
 }
 
-.event_form {
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 40px;
+h1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  font-weight: 750;
+  margin: 0 0 1.65rem;
+}
+
+.form-group { margin-bottom: 1.1rem; }
+.form-group label { font-weight: 600; margin-bottom: 0.35rem; }
+.form-check {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding-left: 0;
+}
+.form-check-input {
+  position: static;
+  margin: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--accent);
+}
+.form-check-label { margin-bottom: 0 !important; }
+
+.form-control, .form-control:focus {
+  min-height: 48px;
+  border-radius: 0.8rem;
+  border: 1px solid var(--line);
+  background-color: #100f19;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.form-control:disabled { background-color: #262437; }
+.form-control::placeholder { color: #aaa1ba; }
+.form-control:focus { border-color: var(--accent); box-shadow: none; }
+.search-actions { display: flex; gap: 0.65rem; }
+
+.search-actions button {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 1.5rem;
+  padding: 0.55rem 1.2rem;
+  font-weight: 700;
+}
+
+.search-submit { flex: 1; background: var(--accent); color: var(--ink); }
+.search-submit:disabled { opacity: 0.65; }
+.search-clear { background: #2c283b; color: var(--text); }
+
+@media (max-width: 640px) {
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin: 0;
+  }
+  .form-row > div { padding-inline: 0; }
 }
